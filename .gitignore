@@ -4,6 +4,8 @@ venv/
 # Ignore the documentation directory
 docs/
 
+models/
+
 # Ignore the embeddings directory
 embeddings/
 
