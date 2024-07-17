@@ -3,7 +3,7 @@ import os
 import huggingface_hub
 
 model_name = "meta-llama/Meta-Llama-3-8B-Instruct"  # 사용할 모델 이름
-model_dir = "models/llama3-small"  # 모델을 저장할 로컬 디렉토리
+model_dir = "./models/llama3-small"  # 모델을 저장할 로컬 디렉토리
 
 api_key = os.getenv("HUGGINGFACE_API_KEY")
 
