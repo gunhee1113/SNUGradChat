@@ -1,16 +1,15 @@
 # embedding.py
 import os
 import glob
-import pickle
-from sentence_transformers import SentenceTransformer
-from langchain.vectorstores import FAISS
-from langchain.document_loaders import PyPDFLoader
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import Chroma
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.docstore.document import Document
+from langchain_openai import OpenAIEmbeddings
 
-def create_embeddings(pdf_root_directory, embeddings_file):
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+api_key = os.getenv("OPENAI_API_KEY")
+
+def create_embeddings(pdf_root_directory, embeddings_dir):
+    embeddings = OpenAIEmbeddings()
 
     documents = []
     # 학과별 디렉토리를 순회
@@ -24,24 +23,18 @@ def create_embeddings(pdf_root_directory, embeddings_file):
             loader = PyPDFLoader(pdf_file)
             pdf_documents = loader.load()
 
-            # TextSplitter를 사용하여 텍스트 분할
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-            for pdf_doc in pdf_documents:
-                texts = text_splitter.split_text(pdf_doc.page_content)
-                for text in texts:
-                    # 학과명을 메타데이터로 포함
-                    documents.append(Document(page_content=text, metadata={"department": department_name}))
+            # 모든 페이지의 텍스트를 하나로 결합
+            full_text = '\n\n'.join([pdf_doc.page_content for pdf_doc in pdf_documents])
 
-    # FAISS 벡터 스토어 생성
-    vector_store = FAISS.from_documents(documents, embeddings)
+            # 하나의 Document 객체로 추가
+            documents.append(Document(page_content=full_text, metadata={"department": department_name, "file_name": os.path.basename(pdf_file)}))
+
+    # Chroma 벡터 스토어 생성
+    vector_store = Chroma.from_documents(documents, embeddings, persist_directory=embeddings_dir)
     
-    # 벡터 스토어 저장
-    with open(embeddings_file, 'wb') as f:
-        pickle.dump(vector_store, f)
-    
-    print(f"Embeddings saved to {embeddings_file}")
+    print(f"Embeddings saved to {embeddings_dir}") 
 
 if __name__ == "__main__":
     pdf_root_directory = './docs'  # 학과별 PDF 파일들이 있는 루트 디렉토리
-    embeddings_file = './embeddings/embeddings.pkl'  # 저장할 임베딩 파일 경로
-    create_embeddings(pdf_root_directory, embeddings_file)
+    embeddings_dir = './embeddings'  # 저장할 임베딩 파일 경로
+    create_embeddings(pdf_root_directory, embeddings_dir)

@@ -5,6 +5,7 @@ from langchain.vectorstores.faiss import FAISS
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 import uvicorn
+import requests
 
 class Question(BaseModel):
     query: str
@@ -17,37 +18,35 @@ model_dir = "./models/llama3-small"
 with open(embeddings_file, 'rb') as f:
     vector_store = pickle.load(f)
 
-tokenizer = AutoTokenizer.from_pretrained(model_dir)
-model = AutoModelForCausalLM.from_pretrained(model_dir)
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
-model.to(device)
-
-def answer_question(vector_store, query, model, tokenizer):
+def answer_question(vector_store, query):
     similar_docs = vector_store.similarity_search(query, k=5)
-    context = " ".join([f"[{doc.metadata['department']}] {doc.page_content}" for doc in similar_docs])
+    context = "\n\n".join([f"[{doc.metadata['department']}] {doc.page_content}" for doc in similar_docs])
 
-    inputs = tokenizer(context + f"\nQuestion: {query}\nAnswer:", return_tensors='pt')
-    inputs = {key: value.to(device) for key, value in inputs.items()}
+    data = {
+        "model": "llama3",
+        "messages": [
+            {
+                "role": "user",
+                "content": context + f"\nQuestion: {query}\nAnswer:"
 
-    print("inputs:", inputs)
-    print("decoded inputs:", tokenizer.decode(inputs['input_ids'][0]))
-    
-    print("Generating answer...")
-    
-    with torch.no_grad():
-        outputs = model.generate(**inputs, return_dict_in_generate=True, output_scores=True)
+            }
+        ],
+        "stream": False,
+    }
 
-    print(outputs)
-    
-    answer = tokenizer.decode(outputs[0])
-    return answer
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    url = "http://localhost:11434/api/chat"
+
+    response = requests.post(url, headers=headers, json=data)
+    return response.json()["message"]["content"]
 
 @app.post("/ask")
 async def ask_question(question: Question):
     try:
-        answer = answer_question(vector_store, question.query, model, tokenizer)
+        answer = answer_question(vector_store, question.query)
         return {"answer": answer}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
