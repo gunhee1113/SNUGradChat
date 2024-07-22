@@ -1,15 +1,6 @@
 # main.py
 import streamlit as st
-from langchain_openai import ChatOpenAI
-from langchain import hub
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain.retrievers.self_query.base import SelfQueryRetriever
-from langchain.chains.query_constructor.base import AttributeInfo
-from rag import rag_manager, aoss_rag_manager
+from rag import rag_manager
 
 
 if __name__ == "__main__":
