@@ -9,6 +9,10 @@ from langchain_openai import OpenAIEmbeddings
 api_key = os.getenv("OPENAI_API_KEY")
 
 def create_embeddings(pdf_root_directory, embeddings_dir):
+    if os.path.exists(embeddings_dir):
+        os.remove(embeddings_dir)
+    os.makedirs(embeddings_dir)
+
     embeddings = OpenAIEmbeddings()
 
     documents = []
@@ -26,8 +30,11 @@ def create_embeddings(pdf_root_directory, embeddings_dir):
             # 모든 페이지의 텍스트를 하나로 결합
             full_text = '\n\n'.join([pdf_doc.page_content for pdf_doc in pdf_documents])
 
+            #pdf_file에서 앞에 ./를 제거
+            pdf_file = pdf_file[2:]
+
             # 하나의 Document 객체로 추가
-            documents.append(Document(page_content=full_text, metadata={"department": department_name, "file_name": os.path.basename(pdf_file)}))
+            documents.append(Document(page_content=full_text, metadata={"department": department_name, "file_location": pdf_file}))
 
     # Chroma 벡터 스토어 생성
     vector_store = Chroma.from_documents(documents, embeddings, persist_directory=embeddings_dir)

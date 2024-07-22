@@ -9,14 +9,15 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain.chains.query_constructor.base import AttributeInfo
-from rag import rag_manager
+from rag import rag_manager, aoss_rag_manager
+
 
 if __name__ == "__main__":
-    st.title("💬 Chatbot")
-    st.caption("🚀 A Streamlit chatbot powered by OpenAI")
+    st.title("💬 SNUGradChat")
+    st.caption("🚀 Chatbot for grad conditions")
     manager = rag_manager()
     if "messages" not in st.session_state:
-        st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+        st.session_state["messages"] = [{"role": "assistant", "content": "졸업규정에 대해 질문해보세요!"}]
 
     for msg in st.session_state.messages:
         st.chat_message(msg["role"]).write(msg["content"])

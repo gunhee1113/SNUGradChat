@@ -12,7 +12,7 @@ from langchain.retrievers.bedrock import AmazonKnowledgeBasesRetriever
 from langchain.chains.query_constructor.base import AttributeInfo
 import os
 import boto3
-from botocore.client import Config
+from s3 import presigned_url
 
 class rag_manager:
     def __init__(self):
@@ -32,6 +32,10 @@ class rag_manager:
             ),AttributeInfo(
                 name="file_name",
                 description="The file name of the document. If contains information about specific graduation regulations, it can be used to refer to the document.",
+                type="string",
+            ),AttributeInfo(
+                name="file_location",
+                description="The location of the document.",
                 type="string",
             ),
         ]
@@ -66,13 +70,14 @@ class rag_manager:
             \n
             "(relevant text in the context below)
             \n\n
-            [department : (department)] [file_name : (file_name)]"
+            reference : (file_location)"
             \n
             ------------------------------------------\n
             Example\n
             context : 
             <context>
-            [department : 컴퓨터공학부] [file_name : 주전공(다전공)-졸업규정.pdf] 2015~2018학번
+            [department : 컴퓨터공학부] [file_location : ./docs/컴퓨터공학부/주전공(다전공)-졸업규정.pdf]
+            2015~2018학번
             이수학점
             컴퓨터공학부의 전공학점을 41학점 이상 이수하고 타 학부에서 정하는 필요학점 이수
             전필
@@ -90,7 +95,8 @@ class rag_manager:
             컴퓨터공학세미나, IT-리더십세미나, 프로젝트1 또는 프로젝트2
             2 / 2
 
-            [department : 컴퓨터공학부] [file_name : 주전공(단일전공)-졸업규정.pdf] 전필
+            [department : 컴퓨터공학부] [file_location : ./docs/컴퓨터공학부/주전공(단일전공)-졸업규정.pdf]
+            전필
             이산수학(3) 논리설계(4), 컴퓨터프로그래밍(4), 전기전자회로(3), 자료구조(4), 컴퓨터구조(3), 
             소프트웨어 개발의 원리와 실습(4), 시스템프로그래밍(4), 알고리즘(3), 공대 공통교과목(3)
             전선내규필수
@@ -128,7 +134,7 @@ class rag_manager:
             전선내규필수 : 소프트웨어 개발의 원리와 실습(4), 컴퓨터공학세미나(1) 또는 IT-리더십세미나(1)(세미나는 1과목만 이수),  
             창의적통합설계 1(3) 또는 창의적통합설계 2(3)\n
 
-            reference : [department : 컴퓨터공학부] [file_name : ./docs/컴퓨터공학부/주전공(단일전공)-졸업규정.pdf]
+            reference : docs/컴퓨터공학부/주전공(단일전공)-졸업규정.pdf
             </answer>\n
             ------------------------------------------\n
             \n
@@ -151,13 +157,16 @@ class rag_manager:
         )
 
     def format_docs(self, docs):
-        return "\n\n".join([f"[department : {doc.metadata['department']}] [file_name : {doc.metadata['file_name']}] {doc.page_content}" for doc in docs])
+        return "\n\n".join([f"[department : {doc.metadata['department']}] [file_location : {doc.metadata['file_location']}]\n{doc.page_content}" for doc in docs])
     
     def answer_question(self, question):
         context = self.retriever.invoke(question)
         formatted_context = self.format_docs(context)
         print("context : \n", formatted_context)
         response = self.rag_chain.invoke(question)
+        url = response.split(" ")[-1]
+        doc_url = presigned_url(os.getenv("S3_BUCKET_NAME"), url)
+        response = response + "\n\n" + "url: " + doc_url
         return response
 
 class aoss_rag_manager(rag_manager):
@@ -168,14 +177,11 @@ class aoss_rag_manager(rag_manager):
 
         session = boto3.Session(profile_name='default')
         region = "ap-northeast-1"
-        bedrock_config = Config(connect_timeout=120, read_timeout=120, retries={'max_attempts': 0})
         bedrock_client = boto3.client('bedrock-runtime', region_name = region)
-        bedrock_agent_client = boto3.client("bedrock-agent-runtime",
-                                    config=bedrock_config, region_name = region)
 
         #retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
         self.retriever = AmazonKnowledgeBasesRetriever(
-            knowledge_base_id="VDODH8ETRO",
+            knowledge_base_id="45DY7IMJKJ",
             retrieval_config={"vectorSearchConfiguration": 
                                 {"numberOfResults": 4,
                                 'overrideSearchType': "SEMANTIC", # optional
@@ -193,7 +199,7 @@ class aoss_rag_manager(rag_manager):
             When you answer, please make sure to specify which reference
             in the context you used to answer at the last line of your answer.
             The reference should have the format of 
-            \n\n[department : (department)] [file_name : (file_name)]. 
+            \n\n[file_location : (file_name)]. 
             The department and file_name should be the metadata of the document.
             Also, please just use only necessary context among the retrieved context.
             the content of reference can be found in the context below.
@@ -205,7 +211,7 @@ class aoss_rag_manager(rag_manager):
             \n
             "(relevant text in the context below)
             \n\n
-            [department : (department)] [file_name : (file_name)]"
+            [file_location : (file_name)]"
             \n
             ------------------------------------------\n
             Example\n
@@ -267,7 +273,7 @@ class aoss_rag_manager(rag_manager):
             전선내규필수 : 소프트웨어 개발의 원리와 실습(4), 컴퓨터공학세미나(1) 또는 IT-리더십세미나(1)(세미나는 1과목만 이수),  
             창의적통합설계 1(3) 또는 창의적통합설계 2(3)\n
 
-            reference : [department : 컴퓨터공학부] [file_name : ./docs/컴퓨터공학부/주전공(단일전공)-졸업규정.pdf]
+            reference : [file_location : s3://snugradchat-bucket/docs/컴퓨터공학부/부전공-졸업규정.pdf]
             </answer>\n
             ------------------------------------------\n
             \n
@@ -290,7 +296,7 @@ class aoss_rag_manager(rag_manager):
         )
 
     def format_docs(self, docs):
-        return "\n\n".join([f"{doc.page_content}" for doc in docs])
+        return "\n\n".join([f"[file : {doc.metadata['location']['s3Location']['uri']}] {doc.page_content}" for doc in docs])
     
     def answer_question(self, question):
         context = self.retriever.invoke(question)
