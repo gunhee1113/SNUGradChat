@@ -1,12 +1,11 @@
 import boto3.session
 import streamlit as st
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain import hub
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import OpenAIEmbeddings
 from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain.retrievers.bedrock import AmazonKnowledgeBasesRetriever
 from langchain.chains.query_constructor.base import AttributeInfo
@@ -30,23 +29,19 @@ class rag_manager:
                 description="The department of the document",
                 type="string",
             ),AttributeInfo(
-                name="file_name",
-                description="The file name of the document. If contains information about specific graduation regulations, it can be used to refer to the document.",
-                type="string",
-            ),AttributeInfo(
                 name="file_location",
-                description="The location of the document.",
+                description="The location of the document. It is used to provide the reference of the document. It contains the file name too.",
                 type="string",
             ),
         ]
 
-        #retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
-        self.retriever = SelfQueryRetriever.from_llm(
+        self.retriever = self.vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5})
+        """self.retriever = SelfQueryRetriever.from_llm(
             self.llm,
             self.vector_store,
             document_contents="Graduation regulations by department",
             metadata_field_info=self.metadata_field_info,
-        )
+        )"""
 
         self.system_prompt = (
             """You are an assistant for question-answering tasks. 
@@ -70,7 +65,7 @@ class rag_manager:
             \n
             "(relevant text in the context below)
             \n\n
-            reference : (file_location)"
+            reference : docs/../file_name.pdf"
             \n
             ------------------------------------------\n
             Example\n
@@ -165,8 +160,9 @@ class rag_manager:
         print("context : \n", formatted_context)
         response = self.rag_chain.invoke(question)
         url = response.split(" ")[-1]
-        doc_url = presigned_url(os.getenv("S3_BUCKET_NAME"), url)
-        response = response + "\n\n" + "url: " + doc_url
+        if(url.startswith("docs")):
+            doc_url = presigned_url(os.getenv("S3_BUCKET_NAME"), url)
+            response = response + "\n\n" + "url: " + doc_url
         return response
 
 class aoss_rag_manager(rag_manager):

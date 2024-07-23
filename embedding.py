@@ -35,6 +35,7 @@ def create_embeddings(pdf_root_directory, embeddings_dir):
 
             # 하나의 Document 객체로 추가
             documents.append(Document(page_content=full_text, metadata={"department": department_name, "file_location": pdf_file}))
+            print(f"Added document from {pdf_file}")
 
     # Chroma 벡터 스토어 생성
     vector_store = Chroma.from_documents(documents, embeddings, persist_directory=embeddings_dir)
