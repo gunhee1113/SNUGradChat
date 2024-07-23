@@ -56,6 +56,7 @@ class rag_manager:
             \n\n[department : (department)] [file_name : (file_name)]. 
             The department and file_name should be the metadata of the document.
             Also, please just use only necessary context among the retrieved context.
+            And, if you cannot answer the question, don't provide any reference.
             the content of reference can be found in the context below.
 
             Furthermore, when you answer, don't make answer by yourself. 
@@ -65,7 +66,7 @@ class rag_manager:
             \n
             "(relevant text in the context below)
             \n\n
-            reference : docs/../file_name.pdf"
+            reference : docs/../file_name.pdf"(if you know the answer)
             \n
             ------------------------------------------\n
             Example\n
